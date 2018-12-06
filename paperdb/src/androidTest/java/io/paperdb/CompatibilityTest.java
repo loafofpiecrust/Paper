@@ -20,8 +20,8 @@ public class CompatibilityTest {
 
     @Before
     public void setUp() throws Exception {
-        Paper.init(getTargetContext());
-        Paper.book().destroy();
+        Paper.INSTANCE.init(getTargetContext().getFilesDir());
+        Paper.INSTANCE.book().destroy();
     }
 
     @Test
@@ -34,10 +34,10 @@ public class CompatibilityTest {
         testClass.timestamp = 123;
 
         // Save original class. Only class name is changed to TestClassNew
-        Paper.book().write("test", testClass);
+        Paper.INSTANCE.book().write("test", testClass);
 
         // Read and instantiate a modified class TestClassNew based on saved data in TestClass
-        TestClassNew newTestClass = Paper.book().read("test");
+        TestClassNew newTestClass = Paper.INSTANCE.book().read("test");
         // Check original value is restored despite new default value in TestClassNew
         assertThat(newTestClass.name).isEqualTo("original");
         // Check default value for new added field
@@ -51,9 +51,9 @@ public class CompatibilityTest {
         TestClass testClass = getClassInstanceWithNewName(TestClass.class,
                 TestClassNotCompatible.class.getName());
         testClass.timestamp = 123;
-        Paper.book().write("not-compatible", testClass);
+        Paper.INSTANCE.book().write("not-compatible", testClass);
 
-        Paper.book().<TestClassNotCompatible>read("not-compatible");
+        Paper.INSTANCE.book().<TestClassNotCompatible>read("not-compatible");
     }
 
     @Test
@@ -62,9 +62,9 @@ public class CompatibilityTest {
         tc.timestamp = 123;
         tc.transientField = "changed";
 
-        Paper.book().write("transient-class", tc);
+        Paper.INSTANCE.book().write("transient-class", tc);
 
-        TestClassTransient readTc = Paper.book().read("transient-class");
+        TestClassTransient readTc = Paper.INSTANCE.book().read("transient-class");
         assertThat(readTc.timestamp).isEqualTo(123);
         assertThat(readTc.transientField).isEqualTo("default");
     }

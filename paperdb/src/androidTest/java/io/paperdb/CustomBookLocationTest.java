@@ -22,7 +22,7 @@ public class CustomBookLocationTest {
 
     @Before
     public void setUp() {
-        Paper.init(getTargetContext());
+        Paper.INSTANCE.init(getTargetContext().getFilesDir());
     }
 
     @Test
@@ -31,7 +31,7 @@ public class CustomBookLocationTest {
         deleteRecursive(new File(getTargetContext().getFilesDir() + "/custom"));
 
         String customLocation = getTargetContext().getFilesDir() + "/custom/location";
-        Book book = Paper.bookOn(customLocation);
+        Book book = Paper.INSTANCE.bookOn(customLocation);
 
         book.write("city", "Victoria");
         assertEquals("Victoria", book.read("city"));
@@ -58,8 +58,8 @@ public class CustomBookLocationTest {
     @Test
     public void readWriteDelete_customLocation_defaultBook() {
         String customLocation = getTargetContext().getFilesDir() + "/custom_location";
-        Book bookOnSdcard = Paper.bookOn(customLocation);
-        Book defaultBook = Paper.book();
+        Book bookOnSdcard = Paper.INSTANCE.bookOn(customLocation);
+        Book defaultBook = Paper.INSTANCE.book();
 
         bookOnSdcard.destroy();
         defaultBook.destroy();
@@ -79,8 +79,8 @@ public class CustomBookLocationTest {
     @Test
     public void readWriteDelete_customLocation_customBook() {
         String customLocation = getTargetContext().getFilesDir() + "/custom/location";
-        Book bookOnSdcard = Paper.bookOn(customLocation, "encyclopedia");
-        Book defaultBook = Paper.book("encyclopedia");
+        Book bookOnSdcard = Paper.INSTANCE.bookOn(customLocation, "encyclopedia");
+        Book defaultBook = Paper.INSTANCE.book("encyclopedia");
 
         bookOnSdcard.destroy();
         defaultBook.destroy();
@@ -100,7 +100,7 @@ public class CustomBookLocationTest {
     @Test
     public void useCacheFolderAsCustomLocation() {
         String cachePath = getTargetContext().getCacheDir().toString();
-        Book cache = Paper.bookOn(cachePath);
+        Book cache = Paper.INSTANCE.bookOn(cachePath);
         cache.destroy();
 
         cache.write("city", "Kyiv");
@@ -111,8 +111,8 @@ public class CustomBookLocationTest {
 
     @Test
     public void getPath() {
-        Book defaultBookOnSdCard = Paper.bookOn("/sdcard");
-        Book encyclopediaOnSdCard = Paper.bookOn("/sdcard", "encyclopedia");
+        Book defaultBookOnSdCard = Paper.INSTANCE.bookOn("/sdcard");
+        Book encyclopediaOnSdCard = Paper.INSTANCE.bookOn("/sdcard", "encyclopedia");
 
         assertEquals("/sdcard/io.paperdb", defaultBookOnSdCard.getPath());
         assertEquals("/sdcard/io.paperdb/key.pt", defaultBookOnSdCard.getPath("key"));
@@ -122,10 +122,10 @@ public class CustomBookLocationTest {
 
     @Test
     public void bookInstanceIsTheSameForSameLocationAndBookName() {
-        Book defaultBook = Paper.book();
-        Book encyclopedia = Paper.book("encyclopedia");
-        Book defaultBookOnSdCard = Paper.bookOn("/sdcard");
-        Book encyclopediaOnSdCard = Paper.bookOn("/sdcard", "encyclopedia");
+        Book defaultBook = Paper.INSTANCE.book();
+        Book encyclopedia = Paper.INSTANCE.book("encyclopedia");
+        Book defaultBookOnSdCard = Paper.INSTANCE.bookOn("/sdcard");
+        Book encyclopediaOnSdCard = Paper.INSTANCE.bookOn("/sdcard", "encyclopedia");
 
         // Check all instances are unique
         HashSet<Book> instanceSet = new HashSet<>();
@@ -135,20 +135,20 @@ public class CustomBookLocationTest {
         instanceSet.add(encyclopediaOnSdCard);
         assertEquals(4, instanceSet.size());
 
-        assertSame(defaultBook, Paper.book());
-        assertSame(encyclopedia, Paper.book("encyclopedia"));
-        assertSame(defaultBookOnSdCard, Paper.bookOn("/sdcard"));
-        assertSame(encyclopediaOnSdCard, Paper.bookOn("/sdcard", "encyclopedia"));
+        assertSame(defaultBook, Paper.INSTANCE.book());
+        assertSame(encyclopedia, Paper.INSTANCE.book("encyclopedia"));
+        assertSame(defaultBookOnSdCard, Paper.INSTANCE.bookOn("/sdcard"));
+        assertSame(encyclopediaOnSdCard, Paper.INSTANCE.bookOn("/sdcard", "encyclopedia"));
     }
 
     @Test
     public void locationCanBeWithFileSeparatorAtTheEnd() {
-        assertEquals("/sdcard/io.paperdb", Paper.bookOn("/sdcard").getPath());
-        assertEquals("/sdcard/io.paperdb", Paper.bookOn("/sdcard/").getPath());
+        assertEquals("/sdcard/io.paperdb", Paper.INSTANCE.bookOn("/sdcard").getPath());
+        assertEquals("/sdcard/io.paperdb", Paper.INSTANCE.bookOn("/sdcard/").getPath());
         assertEquals("/sdcard/encyclopedia",
-                Paper.bookOn("/sdcard", "encyclopedia").getPath());
+                Paper.INSTANCE.bookOn("/sdcard", "encyclopedia").getPath());
         assertEquals("/sdcard/encyclopedia",
-                Paper.bookOn("/sdcard/", "encyclopedia").getPath());
+                Paper.INSTANCE.bookOn("/sdcard/", "encyclopedia").getPath());
     }
 
     private void deleteRecursive(File fileOrDirectory) {

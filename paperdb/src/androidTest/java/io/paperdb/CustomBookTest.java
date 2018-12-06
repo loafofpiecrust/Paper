@@ -16,36 +16,36 @@ public class CustomBookTest {
 
     @Before
     public void setUp() {
-        Paper.init(getTargetContext());
+        Paper.INSTANCE.init(getTargetContext().getFilesDir());
     }
 
     @Test
     public void getFolderPathForBook_custom() {
-        String path = Paper.book("custom").getPath();
+        String path = Paper.INSTANCE.book("custom").getPath();
         assertTrue(path.endsWith("/io.paperdb.test/files/custom"));
     }
 
     @Test
     public void getFilePathForKey_customBook() {
-        String path = Paper.book("custom").getPath("my_key");
+        String path = Paper.INSTANCE.book("custom").getPath("my_key");
         assertTrue(path.endsWith("/io.paperdb.test/files/custom/my_key.pt"));
     }
 
     @Test
     public void readWriteDeleteToDifferentBooks() {
         String custom = "custom";
-        Paper.book().destroy();
-        Paper.book(custom).destroy();
+        Paper.INSTANCE.book().destroy();
+        Paper.INSTANCE.book(custom).destroy();
 
-        Paper.book().write("city", "Victoria");
-        Paper.book(custom).write("city", "Kyiv");
+        Paper.INSTANCE.book().write("city", "Victoria");
+        Paper.INSTANCE.book(custom).write("city", "Kyiv");
 
-        assertEquals("Victoria", Paper.book().read("city"));
-        assertEquals("Kyiv", Paper.book(custom).read("city"));
+        assertEquals("Victoria", Paper.INSTANCE.book().read("city"));
+        assertEquals("Kyiv", Paper.INSTANCE.book(custom).read("city"));
 
-        Paper.book().delete("city");
-        assertFalse(Paper.book().contains("city"));
-        assertTrue(Paper.book(custom).contains("city"));
+        Paper.INSTANCE.book().delete("city");
+        assertFalse(Paper.INSTANCE.book().contains("city"));
+        assertTrue(Paper.INSTANCE.book(custom).contains("city"));
     }
 
 

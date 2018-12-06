@@ -2,26 +2,19 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 buildscript {
-    ext.kotlin_version = '1.1.50'
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
 }
 repositories {
     mavenCentral()
 }
 
 android {
-    compileSdkVersion 26
+    compileSdkVersion 28
     // Must be the same version as in travis.xml
-    buildToolsVersion "26.0.1"
+//    buildToolsVersion "28.0.1"
 
     defaultConfig {
-        minSdkVersion 8
-        targetSdkVersion 26
+        minSdkVersion 16
+        targetSdkVersion 28
         versionCode 1
         versionName "1.0"
 
@@ -58,14 +51,19 @@ afterEvaluate {
 }
 
 dependencies {
-    compile 'com.esotericsoftware:kryo:4.0.1'
-    compile 'de.javakaffee:kryo-serializers:0.40'
+    compile 'com.esotericsoftware:kryo:4.0.2'
+    compile 'de.javakaffee:kryo-serializers:0.42'
 
-    androidTestCompile 'com.orhanobut:hawk:1.14'
-    androidTestCompile 'com.android.support.test:runner:0.5'
-    androidTestCompile 'com.squareup.assertj:assertj-android:1.0.0'
-    androidTestCompile 'joda-time:joda-time:2.9.1'
-    androidTestCompile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    androidTestImplementation 'com.orhanobut:hawk:1.14'
+    androidTestImplementation 'com.squareup.assertj:assertj-android:1.0.0'
+    androidTestImplementation 'joda-time:joda-time:2.9.1'
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
+    androidTestImplementation 'com.android.support.test:rules:1.0.2'
+    testImplementation 'junit:junit:4.12'
+    compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    compile "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
+    compile "org.jetbrains.kotlinx:kotlinx-io-jvm:0.1.1"
+    compile "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.0.1"
 }
 
 apply from: '../publish.gradle'

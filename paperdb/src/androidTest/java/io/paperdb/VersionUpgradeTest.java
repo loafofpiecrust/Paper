@@ -18,8 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class VersionUpgradeTest {
     @Before
     public void setUp() throws Exception {
-        Paper.init(getTargetContext());
-        Paper.book().destroy();
+        Paper.INSTANCE.init(getTargetContext().getFilesDir());
+        Paper.INSTANCE.book().destroy();
     }
 
     @Test
@@ -32,14 +32,14 @@ public class VersionUpgradeTest {
         recipe.ingredients.put("chocolate", 200);
         recipe.duration = 30;
 
-        Paper.book().write("recipe", recipe);
+        Paper.INSTANCE.book().write("recipe", recipe);
     }
 
     @Test
     public void testRead() throws IOException {
         TestUtils.replacePaperDbFileBy("recipe_1.5.pt", "recipe");
 
-        Recipe recipe = Paper.book().read("recipe");
+        Recipe recipe = Paper.INSTANCE.book().read("recipe");
         assertThat(recipe.name).isEqualTo("chocolate cake");
     }
 

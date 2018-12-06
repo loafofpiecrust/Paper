@@ -1,30 +1,49 @@
-package io.paperdb;
+package io.paperdb
 
-import android.content.Context;
+import com.esotericsoftware.kryo.Registration
+import com.esotericsoftware.kryo.Serializer
+import kotlinx.coroutines.runBlocking
+import java.util.HashMap
 
-import com.esotericsoftware.kryo.Serializer;
+class Book internal constructor(
+    dbPath: String,
+    dbName: String,
+    serializers: List<Registration>,
+    registrations: HashMap<Class<*>, Int>
+) {
 
-import java.util.HashMap;
-import java.util.List;
+    private val mStorage = DbStoragePlainFile(
+        dbPath, dbName, serializers, registrations
+    )
 
-@SuppressWarnings({"WeakerAccess", "SameParameterValue"})
-public class Book {
+    /**
+     * Returns all keys for objects in book.
+     *
+     * @return all keys
+     */
+    val allKeys: List<String>
+        get() = mStorage.allKeys
 
-    private final DbStoragePlainFile mStorage;
+    /**
+     * Returns path to a folder containing *.pt files for all keys kept
+     * in the current Book. Could be handy for Book export/import purposes.
+     * The returned path does not exist if the method has been called prior
+     * saving any data in the current Book.
+     *
+     *
+     * See also [.getPath].
+     *
+     * @return path to a folder locating data files for the current Book
+     */
+    val path: String
+        get() = mStorage.rootFolderPath
 
-    protected Book(Context context, String dbName, HashMap<Class, Serializer> serializers) {
-        mStorage = new DbStoragePlainFile(context.getApplicationContext(), dbName, serializers);
-    }
-
-    protected Book(String dbPath, String dbName, HashMap<Class, Serializer> serializers) {
-        mStorage = new DbStoragePlainFile(dbPath, dbName, serializers);
-    }
 
     /**
      * Destroys all data saved in Book.
      */
-    public void destroy() {
-        mStorage.destroy();
+    fun destroy() {
+        mStorage.destroy()
     }
 
     /**
@@ -34,44 +53,46 @@ public class Book {
      * @param value object to save, must have no-arg constructor, can't be null.
      * @param <T>   object type
      * @return this Book instance
-     */
-    public <T> Book write(String key, T value) {
+    </T> */
+    fun <T> write(key: String, value: T?): Book {
         if (value == null) {
-            throw new PaperDbException("Paper doesn't support writing null root values");
-        } else {
-            mStorage.insert(key, value);
+            throw PaperDbException("Paper doesn't support writing null root values")
+        } else runBlocking {
+            mStorage.insert(key, value)
         }
-        return this;
+        return this
     }
 
     /**
      * Instantiates saved object using original object class (e.g. LinkedList). Support limited
      * backward and forward compatibility: removed fields are ignored, new fields have their
      * default values.
-     * <p/>
+     *
+     *
      * All instantiated objects must have no-arg constructors.
      *
      * @param key object key to read
      * @return the saved object instance or null
      */
-    public <T> T read(String key) {
-        return read(key, null);
+    fun <T> read(key: String): T? {
+        return read<T>(key, null)
     }
 
     /**
      * Instantiates saved object using original object class (e.g. LinkedList). Support limited
      * backward and forward compatibility: removed fields are ignored, new fields have their
      * default values.
-     * <p/>
+     *
+     *
      * All instantiated objects must have no-arg constructors.
      *
      * @param key          object key to read
      * @param defaultValue will be returned if key doesn't exist
      * @return the saved object instance or null
      */
-    public <T> T read(String key, T defaultValue) {
-        T value = mStorage.select(key);
-        return value == null ? defaultValue : value;
+    fun <T> read(key: String, defaultValue: T?): T? = runBlocking {
+        val value = mStorage.select<T>(key)
+        value ?: defaultValue
     }
 
     /**
@@ -80,8 +101,8 @@ public class Book {
      * @param key object key
      * @return true if Book storage contains an object with given key, false otherwise
      */
-    public boolean contains(String key) {
-        return mStorage.exists(key);
+    operator fun contains(key: String): Boolean {
+        return mStorage.exists(key)
     }
 
     /**
@@ -89,10 +110,10 @@ public class Book {
      *
      * @param key object key
      * @return true if object with given key exists in Book storage, false otherwise
-     * @deprecated As of release 2.6, replaced by {@link #contains(String)}}
      */
-    public boolean exist(String key) {
-        return mStorage.exists(key);
+    @Deprecated("As of release 2.6, replaced by {@link #contains(String)}}")
+    fun exist(key: String): Boolean {
+        return mStorage.exists(key)
     }
 
     /**
@@ -103,8 +124,8 @@ public class Book {
      * @param key object key
      * @return timestamp of last write for given key in ms if it exists, otherwise -1
      */
-    public long lastModified(String key) {
-        return mStorage.lastModified(key);
+    fun lastModified(key: String): Long {
+        return mStorage.lastModified(key)
     }
 
     /**
@@ -112,40 +133,17 @@ public class Book {
      *
      * @param key object key
      */
-    public void delete(String key) {
-        mStorage.deleteIfExists(key);
-    }
-
-    /**
-     * Returns all keys for objects in book.
-     *
-     * @return all keys
-     */
-    public List<String> getAllKeys() {
-        return mStorage.getAllKeys();
+    fun delete(key: String) {
+        mStorage.deleteIfExists(key)
     }
 
     /**
      * Sets log level for internal Kryo serializer
      *
-     * @param level one of levels from {@link com.esotericsoftware.minlog.Log }
+     * @param level one of levels from [com.esotericsoftware.minlog.Log]
      */
-    public void setLogLevel(int level) {
-        mStorage.setLogLevel(level);
-    }
-
-    /**
-     * Returns path to a folder containing *.pt files for all keys kept
-     * in the current Book. Could be handy for Book export/import purposes.
-     * The returned path does not exist if the method has been called prior
-     * saving any data in the current Book.
-     * <p>
-     * See also {@link #getPath(String)}.
-     *
-     * @return path to a folder locating data files for the current Book
-     */
-    public String getPath() {
-        return mStorage.getRootFolderPath();
+    fun setLogLevel(level: Int) {
+        mStorage.setLogLevel(level)
     }
 
     /**
@@ -153,13 +151,14 @@ public class Book {
      * Could be handy for object export/import purposes.
      * The returned path does not exist if the method has been called prior
      * saving data for the given key.
-     * <p>
-     * See also {@link #getPath()}.
+     *
+     *
+     * See also [.getPath].
      *
      * @param key object key
      * @return path to a *.pt file containing saved object for a given key.
      */
-    public String getPath(String key) {
-        return mStorage.getOriginalFilePath(key);
+    fun getPath(key: String): String {
+        return mStorage.getOriginalFilePath(key)
     }
 }

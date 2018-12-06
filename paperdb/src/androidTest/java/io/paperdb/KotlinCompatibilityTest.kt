@@ -2,6 +2,7 @@ package io.paperdb
 
 import android.support.test.InstrumentationRegistry.getTargetContext
 import android.support.test.runner.AndroidJUnit4
+import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Before
 import org.junit.Test
@@ -13,7 +14,7 @@ class KotlinCompatibilityTest {
     @Before
     @Throws(Exception::class)
     fun setUp() {
-        Paper.init(getTargetContext())
+        Paper.init(getTargetContext().filesDir)
         Paper.book().destroy()
     }
 
@@ -82,11 +83,11 @@ class KotlinCompatibilityTest {
         testReadWrite(PersonWithLambda { name = "new-name" })
     }
 
-    private fun testReadWriteWithoutClassCheck(originObj: Any): Any {
+    private fun testReadWriteWithoutClassCheck(originObj: Any): Any = runBlocking {
         Paper.book().write("obj", originObj)
         val readObj = Paper.book().read<Any>("obj")
         assertThat(readObj).isEqualTo(originObj)
-        return readObj
+        readObj!!
     }
 
     private fun testReadWrite(originObj: Any) {

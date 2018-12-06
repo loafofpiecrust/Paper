@@ -38,8 +38,8 @@ public class MultiThreadTest {
 
     @Before
     public void setUp() {
-        Paper.init(getTargetContext());
-        Paper.book().destroy();
+        Paper.INSTANCE.init(getTargetContext().getFilesDir());
+        Paper.INSTANCE.book().destroy();
     }
 
     @Test
@@ -48,50 +48,50 @@ public class MultiThreadTest {
 
         Log.d(TAG, "read dataset: start");
         // Read for same key 'dataset' should be postponed until writing is done
-        List<Person> readData = Paper.book().read("dataset", Collections.<Person>emptyList());
+        List<Person> readData = Paper.INSTANCE.book().read("dataset", Collections.<Person>emptyList());
         assertEquals(10000, readData.size());
         Log.d(TAG, "read dataset: finish");
     }
 
     @Test
     public void write_exists_same_key() throws InterruptedException {
-        assertFalse(Paper.book().contains("dataset"));
+        assertFalse(Paper.INSTANCE.book().contains("dataset"));
 
         startWritingLargeDataSetInSeparateThread("dataset");
 
         Log.d(TAG, "check dataset contains: start");
         // Read for same key 'dataset' should be postponed until writing is done
-        assertTrue(Paper.book().contains("dataset"));
+        assertTrue(Paper.INSTANCE.book().contains("dataset"));
         Log.d(TAG, "check dataset contains: finish");
     }
 
     @Test
     public void write_delete_same_key() throws InterruptedException {
-        assertFalse(Paper.book().contains("dataset"));
+        assertFalse(Paper.INSTANCE.book().contains("dataset"));
 
         startWritingLargeDataSetInSeparateThread("dataset");
 
         Log.d(TAG, "check dataset delete: start");
         // Read for same key 'dataset' should be postponed until writing is done
-        Paper.book().delete("dataset");
-        assertFalse(Paper.book().contains("dataset"));
+        Paper.INSTANCE.book().delete("dataset");
+        assertFalse(Paper.INSTANCE.book().contains("dataset"));
         Log.d(TAG, "check dataset delete: finish");
     }
 
     @Test
     public void read_write_different_keys() throws InterruptedException {
         // Primary write something else
-        Paper.book().write("city", "Victoria");
+        Paper.INSTANCE.book().write("city", "Victoria");
 
         // Start writing large dataset
         CountDownLatch writeEndLatch = startWritingLargeDataSetInSeparateThread("dataset");
 
         Log.d(TAG, "read other key: start");
         // Read for different key 'city' should be locked by writing other key 'dataset'
-        assertEquals("Victoria", Paper.book().read("city"));
+        assertEquals("Victoria", Paper.INSTANCE.book().read("city"));
         assertEquals(1, writeEndLatch.getCount());
         writeEndLatch.await(5, TimeUnit.SECONDS);
-        assertEquals(10000, Paper.book().<List<Person>>read("dataset").size());
+        assertEquals(10000, Paper.INSTANCE.book().<List<Person>>read("dataset").size());
         Log.d(TAG, "read other key: finish");
     }
 
@@ -127,7 +127,7 @@ public class MultiThreadTest {
             public void run() {
                 Log.d(TAG, "write '" + key + "': start");
                 writeStartLatch.countDown();
-                Paper.book().write(key, dataset);
+                Paper.INSTANCE.book().write(key, dataset);
                 Log.d(TAG, "write '" + key + "': finish");
                 writeFinishLatch.countDown();
             }
@@ -144,7 +144,7 @@ public class MultiThreadTest {
             public void run() {
                 int size = new Random().nextInt(200);
                 final List<Person> inserted100 = TestDataGenerator.genPersonList(size);
-                Paper.book().write("persons", inserted100);
+                Paper.INSTANCE.book().write("persons", inserted100);
             }
         };
     }
@@ -153,7 +153,7 @@ public class MultiThreadTest {
         return new Runnable() {
             @Override
             public void run() {
-                Paper.book().read("persons");
+                Paper.INSTANCE.book().read("persons");
             }
         };
     }

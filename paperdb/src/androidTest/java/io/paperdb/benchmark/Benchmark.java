@@ -1,9 +1,10 @@
 package io.paperdb.benchmark;
 
 import android.os.SystemClock;
+import android.support.test.filters.LargeTest;
 import android.support.test.runner.AndroidJUnit4;
-import android.test.AndroidTestCase;
-import android.test.suitebuilder.annotation.LargeTest;
+//import android.test.AndroidTestCase;
+//import android.test.suitebuilder.annotation.LargeTest;
 import android.util.Log;
 
 import com.orhanobut.hawk.Hawk;
@@ -22,7 +23,7 @@ import static android.support.test.InstrumentationRegistry.getTargetContext;
 
 @RunWith(AndroidJUnit4.class)
 @LargeTest
-public class Benchmark extends AndroidTestCase {
+public class Benchmark {
 
     private static final String TAG = "paper-benchmark";
 
@@ -32,8 +33,8 @@ public class Benchmark extends AndroidTestCase {
     @Test
     public void testReadWrite500Contacts() throws Exception {
         final List<Person> contacts = TestDataGenerator.genPersonList(500);
-        Paper.init(getTargetContext());
-        Paper.book().destroy();
+        Paper.INSTANCE.init(getTargetContext().getFilesDir());
+        Paper.INSTANCE.book().destroy();
         long paperTime = runTest(new PaperReadWriteContactsTest(), contacts, REPEAT_COUNT);
 
         Hawk.init(getTargetContext());
@@ -41,8 +42,8 @@ public class Benchmark extends AndroidTestCase {
         long hawkTime = runTest(new HawkReadWriteContactsTest(), contacts, REPEAT_COUNT);
 
         final List<PersonArg> contactsArg = TestDataGenerator.genPersonArgList(500);
-        Paper.init(getTargetContext());
-        Paper.book().destroy();
+        Paper.INSTANCE.init(getTargetContext().getFilesDir());
+        Paper.INSTANCE.book().destroy();
         long paperArg = runTest(new PaperReadWriteContactsArgTest(), contactsArg, REPEAT_COUNT);
 
         printResults("Read/write 500 contacts", paperTime, hawkTime, paperArg);
@@ -51,8 +52,8 @@ public class Benchmark extends AndroidTestCase {
     @Test
     public void testWrite500Contacts() throws Exception {
         final List<Person> contacts = TestDataGenerator.genPersonList(500);
-        Paper.init(getTargetContext());
-        Paper.book().destroy();
+        Paper.INSTANCE.init(getTargetContext().getFilesDir());
+        Paper.INSTANCE.book().destroy();
         long paperTime = runTest(new PaperWriteContactsTest(), contacts, REPEAT_COUNT);
 
         Hawk.init(getTargetContext());
@@ -65,8 +66,8 @@ public class Benchmark extends AndroidTestCase {
     @Test
     public void testRead500Contacts() throws Exception {
         final List<Person> contacts = TestDataGenerator.genPersonList(500);
-        Paper.init(getTargetContext());
-        Paper.book().destroy();
+        Paper.INSTANCE.init(getTargetContext().getFilesDir());
+        Paper.INSTANCE.book().destroy();
         runTest(new PaperWriteContactsTest(), contacts, REPEAT_COUNT); //Prepare
         long paperTime = runTest(new PaperReadContactsTest(), contacts, REPEAT_COUNT);
 
@@ -105,8 +106,8 @@ public class Benchmark extends AndroidTestCase {
         @Override
         public void run(int i, List<Person> extra) {
             String key = "contacts" + i;
-            Paper.book().write(key, extra);
-            Paper.book().<List<Person>>read(key);
+            Paper.INSTANCE.book().write(key, extra);
+            Paper.INSTANCE.book().<List<Person>>read(key);
         }
     }
 
@@ -114,8 +115,8 @@ public class Benchmark extends AndroidTestCase {
         @Override
         public void run(int i, List<PersonArg> extra) {
             String key = "contacts" + i;
-            Paper.book().write(key, extra);
-            Paper.book().<List<Person>>read(key);
+            Paper.INSTANCE.book().write(key, extra);
+            Paper.INSTANCE.book().<List<Person>>read(key);
         }
     }
 
@@ -132,7 +133,7 @@ public class Benchmark extends AndroidTestCase {
         @Override
         public void run(int i, List<Person> extra) {
             String key = "contacts" + i;
-            Paper.book().write(key, extra);
+            Paper.INSTANCE.book().write(key, extra);
         }
     }
 
@@ -148,7 +149,7 @@ public class Benchmark extends AndroidTestCase {
         @Override
         public void run(int i, List<Person> extra) {
             String key = "contacts" + i;
-            Paper.book().<List<Person>>read(key);
+            Paper.INSTANCE.book().<List<Person>>read(key);
         }
     }
 
