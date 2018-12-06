@@ -31,6 +31,7 @@ allprojects {
         }
     }
     tasks.withType(Javadoc) {
+        enabled = false
         options.addStringOption('Xdoclint:none', '-quiet')
         options.addStringOption('encoding', 'UTF-8')
     }
