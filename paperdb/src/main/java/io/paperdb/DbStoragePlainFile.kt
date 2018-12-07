@@ -136,22 +136,18 @@ class DbStoragePlainFile internal constructor(
         return keyLocker.withLock(key) {
             assertInit()
 
-            try {
-                val originalFile = getOriginalFile(key)
-                val backupFile = makeBackupFile(originalFile)
-                if (backupFile.exists()) {
+            val originalFile = getOriginalFile(key)
+            val backupFile = makeBackupFile(originalFile)
+            if (backupFile.exists()) {
 
-                    originalFile.delete()
+                originalFile.delete()
 
-                    backupFile.renameTo(originalFile)
-                }
-
-                if (!existsInternal(key)) {
-                    null
-                } else readTableFile(key, originalFile)
-            } catch (e: Exception) {
-                null
+                backupFile.renameTo(originalFile)
             }
+
+            if (!existsInternal(key)) {
+                null
+            } else readTableFile(key, originalFile)
         }
     }
 
