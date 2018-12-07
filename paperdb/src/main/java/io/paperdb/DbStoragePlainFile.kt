@@ -4,10 +4,11 @@ import android.util.Log
 
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.KryoException
-import com.esotericsoftware.kryo.Registration
+import com.esotericsoftware.kryo.Serializer
 import com.esotericsoftware.kryo.io.Input
 import com.esotericsoftware.kryo.io.Output
 import com.esotericsoftware.kryo.serializers.CompatibleFieldSerializer
+import de.javakaffee.kryoserializers.*
 
 import org.objenesis.strategy.StdInstantiatorStrategy
 
@@ -18,21 +19,16 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.util.ArrayList
 import java.util.Arrays
-import java.util.HashMap
 import java.util.LinkedList
 import java.util.UUID
 
-import de.javakaffee.kryoserializers.ArraysAsListSerializer
-import de.javakaffee.kryoserializers.SynchronizedCollectionsSerializer
-import de.javakaffee.kryoserializers.UUIDSerializer
-import de.javakaffee.kryoserializers.UnmodifiableCollectionsSerializer
 import io.paperdb.serializer.NoArgCollectionSerializer
 
 class DbStoragePlainFile internal constructor(
     dbFilesDir: String,
     dbName: String,
-    private val mCustomSerializers: List<Registration>,
-    private val registrations: HashMap<Class<*>, Int>
+    private val customSerializers: SerializerMap,
+    private val registrations: RegistrationMap
 ) {
 
     internal val rootFolderPath = dbFilesDir + File.separator + dbName
@@ -46,7 +42,7 @@ class DbStoragePlainFile internal constructor(
 
     // remove extensions
     internal val allKeys: List<String>
-        @Synchronized get() {
+        get() {
             assertInit()
 
             val bookFolder = File(rootFolderPath)
@@ -57,7 +53,7 @@ class DbStoragePlainFile internal constructor(
                 }
                 Arrays.asList(*names)
             } else {
-                ArrayList()
+                listOf()
             }
         }
 
@@ -68,32 +64,31 @@ class DbStoragePlainFile internal constructor(
             kryo.fieldSerializerConfig.isOptimizedGenerics = true
         }
 
-//        kryo.register(PaperTable::class.java)
-        kryo.setDefaultSerializer(CompatibleFieldSerializer::class.java)
         kryo.references = false
+        kryo.setDefaultSerializer(CompatibleFieldSerializer::class.java)
 
         // Serialize Arrays$ArrayList
 
-        kryo.register(Arrays.asList("").javaClass, ArraysAsListSerializer())
         UnmodifiableCollectionsSerializer.registerSerializers(kryo)
         SynchronizedCollectionsSerializer.registerSerializers(kryo)
-        // Serialize inner AbstractList$SubAbstractListRandomAccess
-        kryo.addDefaultSerializer(ArrayList<Any>().subList(0, 0).javaClass,
-            NoArgCollectionSerializer())
-        // Serialize AbstractList$SubAbstractList
-        kryo.addDefaultSerializer(LinkedList<Any>().subList(0, 0).javaClass,
-            NoArgCollectionSerializer())
-        // To keep backward compatibility don't change the order of serializers above
+        SubListSerializers.addDefaultSerializers(kryo)
+
+        for ((clazz, serializerClass) in customSerializers) {
+            kryo.addDefaultSerializer(clazz, serializerClass)
+        }
+
+        // To keep backward compatibility don't change the order of serializers below!
+        kryo.register(Arrays.asList("").javaClass, ArraysAsListSerializer())
 
         // UUID support
         kryo.register(UUID::class.java, UUIDSerializer())
 
-        for (reg in mCustomSerializers) {
-            kryo.register(reg)
-        }
-
-        for ((clazz, id) in registrations) {
-            kryo.register(clazz, id)
+        for ((clazz, reg) in registrations) {
+            if (reg.serializer != null) {
+                kryo.register(clazz, reg.serializer, reg.id)
+            } else {
+                kryo.register(clazz, reg.id)
+            }
         }
 
         kryo.instantiatorStrategy = Kryo.DefaultInstantiatorStrategy(StdInstantiatorStrategy())
@@ -112,9 +107,8 @@ class DbStoragePlainFile internal constructor(
         paperDirIsCreated = false
     }
 
-    internal suspend fun <E> insert(key: String, value: E) {
-        try {
-            keyLocker.acquire(key)
+    internal suspend fun insert(key: String, value: Any?) {
+        keyLocker.withLock(key) {
             assertInit()
 
             val originalFile = getOriginalFile(key)
@@ -135,40 +129,35 @@ class DbStoragePlainFile internal constructor(
             }
 
             writeTableFile(key, value, originalFile, backupFile)
-        } finally {
-            keyLocker.release(key)
         }
     }
 
-    internal suspend fun <E> select(key: String): E? {
-        try {
-            keyLocker.acquire(key)
+    internal suspend fun select(key: String): Any? {
+        return keyLocker.withLock(key) {
             assertInit()
 
-            val originalFile = getOriginalFile(key)
-            val backupFile = makeBackupFile(originalFile)
-            if (backupFile.exists()) {
+            try {
+                val originalFile = getOriginalFile(key)
+                val backupFile = makeBackupFile(originalFile)
+                if (backupFile.exists()) {
 
-                originalFile.delete()
+                    originalFile.delete()
 
-                backupFile.renameTo(originalFile)
-            }
+                    backupFile.renameTo(originalFile)
+                }
 
-            return if (!existsInternal(key)) {
+                if (!existsInternal(key)) {
+                    null
+                } else readTableFile(key, originalFile)
+            } catch (e: Exception) {
                 null
-            } else readTableFile<E>(key, originalFile)
-
-        } finally {
-            keyLocker.release(key)
+            }
         }
     }
 
-    internal fun exists(key: String): Boolean {
-        try {
-            keyLocker.acquire(key)
-            return existsInternal(key)
-        } finally {
-            keyLocker.release(key)
+    internal suspend fun exists(key: String): Boolean {
+        return keyLocker.withLock(key) {
+            existsInternal(key)
         }
     }
 
@@ -179,35 +168,27 @@ class DbStoragePlainFile internal constructor(
         return originalFile.exists()
     }
 
-    internal fun lastModified(key: String): Long {
-        try {
-            keyLocker.acquire(key)
+    internal suspend fun lastModified(key: String): Long {
+        return keyLocker.withLock(key) {
             assertInit()
 
             val originalFile = getOriginalFile(key)
-            return if (originalFile.exists()) originalFile.lastModified() else -1
-        } finally {
-            keyLocker.release(key)
+            if (originalFile.exists()) originalFile.lastModified() else -1
         }
     }
 
-    internal fun deleteIfExists(key: String) {
-        try {
-            keyLocker.acquire(key)
+    internal suspend fun deleteIfExists(key: String) {
+        keyLocker.withLock(key) {
             assertInit()
 
             val originalFile = getOriginalFile(key)
-            if (!originalFile.exists()) {
-                return
+            if (originalFile.exists()) {
+                val deleted = originalFile.delete()
+                if (!deleted) {
+                    throw PaperDbException("Couldn't delete file " + originalFile
+                        + " for table " + key)
+                }
             }
-
-            val deleted = originalFile.delete()
-            if (!deleted) {
-                throw PaperDbException("Couldn't delete file " + originalFile
-                    + " for table " + key)
-            }
-        } finally {
-            keyLocker.release(key)
         }
     }
 
@@ -234,7 +215,7 @@ class DbStoragePlainFile internal constructor(
      * @param originalFile file to write new data
      * @param backupFile   backup file to be used if write is failed
      */
-    private suspend fun <E> writeTableFile(key: String, paperTable: E,
+    private suspend fun writeTableFile(key: String, paperTable: Any?,
                                    originalFile: File, backupFile: File) {
         try {
             val fileStream = FileOutputStream(originalFile)
@@ -269,27 +250,16 @@ class DbStoragePlainFile internal constructor(
 
     }
 
-    private suspend fun <E> readTableFile(key: String, originalFile: File): E {
+    private suspend fun readTableFile(key: String, originalFile: File): Any {
         try {
+            if (!originalFile.exists()) {
+                throw FileNotFoundException()
+            }
             return readContent(originalFile)
         } catch (e: FileNotFoundException) {
-            var exception: Exception = e
-            // Give one more chance, read data in paper 1.x compatibility mode
-            if (e is KryoException) {
-                try {
-                    return readContent(originalFile, createKryoInstance(true))
-                } catch (compatibleReadException: FileNotFoundException) {
-                    exception = compatibleReadException
-                } catch (compatibleReadException: KryoException) {
-                    exception = compatibleReadException
-                } catch (compatibleReadException: ClassCastException) {
-                    exception = compatibleReadException
-                }
-
-            }
-            val errorMessage = ("Couldn't read/deserialize file "
+            val errorMessage = ("Couldn't read file "
                 + originalFile + " for table " + key)
-            throw PaperDbException(errorMessage, exception)
+            throw PaperDbException(errorMessage, e)
         } catch (e: KryoException) {
             val exception = try {
                 return readContent(originalFile, createKryoInstance(true))
@@ -300,29 +270,17 @@ class DbStoragePlainFile internal constructor(
             } catch (compatibleReadException: ClassCastException) {
                 compatibleReadException
             }
-            val errorMessage = "Couldn't read/deserialize file $originalFile for table $key"
+            val errorMessage = "Couldn't deserialize file $originalFile for table $key"
             throw PaperDbException(errorMessage, exception)
         } catch (e: ClassCastException) {
-            var exception: Exception = e
-            if (e is KryoException) {
-                try {
-                    return readContent(originalFile, createKryoInstance(true))
-                } catch (compatibleReadException: FileNotFoundException) {
-                    exception = compatibleReadException
-                } catch (compatibleReadException: KryoException) {
-                    exception = compatibleReadException
-                } catch (compatibleReadException: ClassCastException) {
-                    exception = compatibleReadException
-                }
-            }
             val errorMessage = "Couldn't read/deserialize file $originalFile for table $key"
-            throw PaperDbException(errorMessage, exception)
+            throw PaperDbException(errorMessage, e)
         }
 
     }
 
     @Throws(FileNotFoundException::class, KryoException::class)
-    private suspend fun <E> readContent(originalFile: File, kryo: Kryo? = null): E {
+    private suspend fun readContent(originalFile: File, kryo: Kryo? = null): Any {
         return Input(FileInputStream(originalFile)).use { i ->
             val paperTable = if (kryo != null) {
                 kryo.readClassAndObject(i)
@@ -330,7 +288,7 @@ class DbStoragePlainFile internal constructor(
                 this.kryo.use { it.readClassAndObject(i) }
             }
 
-            paperTable as E
+            paperTable
         }
     }
 
@@ -342,10 +300,13 @@ class DbStoragePlainFile internal constructor(
     }
 
     private fun createPaperDir() {
-        if (!File(rootFolderPath).exists()) {
-            val isReady = File(rootFolderPath).mkdirs()
-            if (!isReady) {
-                throw RuntimeException("Couldn't create Paper dir: $rootFolderPath")
+        val rootFile = File(rootFolderPath)
+        if (!rootFile.exists()) {
+            synchronized(Paper) {
+                val isReady = rootFile.mkdirs()
+                if (!isReady && !rootFile.exists()) {
+                    throw RuntimeException("Couldn't create Paper dir: $rootFolderPath")
+                }
             }
         }
     }

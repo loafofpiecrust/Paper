@@ -1,8 +1,12 @@
 package io.paperdb
 
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.channels.ActorScope
+import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.channels.actor
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentMap
-import java.util.concurrent.Semaphore
 
 /**
  * This class allows multiple threads to lock against a string key
@@ -11,29 +15,10 @@ import java.util.concurrent.Semaphore
  * Created by hiperion on 2017/3/15.
  */
 internal class KeyLocker {
-    private val semaphoreMap = ConcurrentHashMap<String, Semaphore>()
+    private val mutexes = ConcurrentHashMap<String, Mutex>()
 
-    fun acquire(key: String?) {
-        if (key == null) {
-            throw IllegalArgumentException("Key couldn't be null")
-        }
-
-        if (!semaphoreMap.containsKey(key)) {
-            semaphoreMap[key] = Semaphore(1, true)
-        }
-        val semaphore = semaphoreMap[key]
-        semaphore!!.acquireUninterruptibly()
+    suspend fun <R> withLock(key: String, block: suspend () -> R): R {
+        val m = mutexes.getOrPut(key) { Mutex(false) }
+        return m.withLock { block() }
     }
-
-    fun release(key: String?) {
-        if (key == null) {
-            throw IllegalArgumentException("Key couldn't be null")
-        }
-
-        val semaphore = semaphoreMap[key]
-            ?: throw IllegalStateException("Couldn't release semaphore. The acquire() with the same key '"
-                + key + "' has to be called prior to calling release()")
-        semaphore.release()
-    }
-
 }

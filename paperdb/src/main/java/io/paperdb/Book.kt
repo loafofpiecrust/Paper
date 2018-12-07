@@ -1,15 +1,13 @@
 package io.paperdb
 
-import com.esotericsoftware.kryo.Registration
 import com.esotericsoftware.kryo.Serializer
 import kotlinx.coroutines.runBlocking
-import java.util.HashMap
 
 class Book internal constructor(
     dbPath: String,
     dbName: String,
-    serializers: List<Registration>,
-    registrations: HashMap<Class<*>, Int>
+    serializers: SerializerMap,
+    registrations: RegistrationMap
 ) {
 
     private val mStorage = DbStoragePlainFile(
@@ -54,12 +52,8 @@ class Book internal constructor(
      * @param <T>   object type
      * @return this Book instance
     </T> */
-    fun <T> write(key: String, value: T?): Book {
-        if (value == null) {
-            throw PaperDbException("Paper doesn't support writing null root values")
-        } else runBlocking {
-            mStorage.insert(key, value)
-        }
+    suspend fun <T> write(key: String, value: T): Book {
+        mStorage.insert(key, value)
         return this
     }
 
@@ -74,25 +68,11 @@ class Book internal constructor(
      * @param key object key to read
      * @return the saved object instance or null
      */
-    fun <T> read(key: String): T? {
-        return read<T>(key, null)
+    suspend fun readAny(key: String): Any? {
+        return mStorage.select(key)
     }
-
-    /**
-     * Instantiates saved object using original object class (e.g. LinkedList). Support limited
-     * backward and forward compatibility: removed fields are ignored, new fields have their
-     * default values.
-     *
-     *
-     * All instantiated objects must have no-arg constructors.
-     *
-     * @param key          object key to read
-     * @param defaultValue will be returned if key doesn't exist
-     * @return the saved object instance or null
-     */
-    fun <T> read(key: String, defaultValue: T?): T? = runBlocking {
-        val value = mStorage.select<T>(key)
-        value ?: defaultValue
+    suspend inline fun <reified T> read(key: String): T? {
+        return readAny(key) as? T
     }
 
     /**
@@ -101,18 +81,7 @@ class Book internal constructor(
      * @param key object key
      * @return true if Book storage contains an object with given key, false otherwise
      */
-    operator fun contains(key: String): Boolean {
-        return mStorage.exists(key)
-    }
-
-    /**
-     * Checks if an object with the given key is saved in Book storage.
-     *
-     * @param key object key
-     * @return true if object with given key exists in Book storage, false otherwise
-     */
-    @Deprecated("As of release 2.6, replaced by {@link #contains(String)}}")
-    fun exist(key: String): Boolean {
+    suspend fun contains(key: String): Boolean {
         return mStorage.exists(key)
     }
 
@@ -124,7 +93,7 @@ class Book internal constructor(
      * @param key object key
      * @return timestamp of last write for given key in ms if it exists, otherwise -1
      */
-    fun lastModified(key: String): Long {
+    suspend fun lastModified(key: String): Long {
         return mStorage.lastModified(key)
     }
 
@@ -133,7 +102,7 @@ class Book internal constructor(
      *
      * @param key object key
      */
-    fun delete(key: String) {
+    suspend fun delete(key: String) {
         mStorage.deleteIfExists(key)
     }
 

@@ -1,15 +1,10 @@
 package io.paperdb
 
-import android.annotation.SuppressLint
 import android.app.Application
-import android.content.Context
-import android.os.Bundle
-import com.esotericsoftware.kryo.Registration
 
 import com.esotericsoftware.kryo.Serializer
 
 import java.io.File
-import java.util.HashMap
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -28,26 +23,23 @@ import java.util.concurrent.ConcurrentHashMap
  * All Paper files are created in the /files/io.paperdb dir in app's private storage.
  */
 object Paper {
-    internal val TAG = "paperdb"
+    internal const val TAG = "paperdb"
 
     const val DEFAULT_DB_NAME = "io.paperdb"
 
-    // Keep _application_ context
-//    @SuppressLint("StaticFieldLeak")
-//    private var mContext: Context? = null
     private var defaultPath: File? = null
 
-    private val mBookMap = ConcurrentHashMap<String, Book>()
-    private val mCustomSerializers = mutableListOf<Registration>()
-    private val customRegistrations = HashMap<Class<*>, Int>()
+    internal class Registration(val id: Int, val serializer: Serializer<*>?)
+
+    private val books = ConcurrentHashMap<String, Book>()
+    private val customSerializers = SerializerMap()
+    private val customRegistrations = RegistrationMap()
 
     /**
      * Lightweight method to init Paper instance. Should be executed in [Application.onCreate]
-     * or [android.app.Activity.onCreate].
+     * or [android.app.Activity.onCreate]
      *
-     *
-     *
-     * @param context context, used to get application context
+     * @param defaultPath root path for all books to save under
      */
     fun init(defaultPath: File) {
         this.defaultPath = defaultPath
@@ -70,9 +62,7 @@ object Paper {
      *
      * @return Book instance
      */
-    fun book(): Book {
-        return getBook(null, DEFAULT_DB_NAME)
-    }
+    fun book(): Book = getBook(null, DEFAULT_DB_NAME)
 
     /**
      * Returns book instance to save data at custom location, e.g. on sdcard.
@@ -83,31 +73,29 @@ object Paper {
      */
     @JvmOverloads
     fun bookOn(location: String, name: String = DEFAULT_DB_NAME): Book {
-        var location = location
-        location = removeLastFileSeparatorIfExists(location)
-        return getBook(location, name)
+        return getBook(removeLastFileSeparator(location), name)
     }
 
+    /**
+     * Returns book instance to save data at custom location, e.g. on sdcard.
+     *
+     * @param location the path to a folder where the book's folder will be placed
+     * @return book instance
+     */
     private fun getBook(location: String?, name: String): Book {
-        if (defaultPath == null) {
-            throw PaperDbException("Paper.init is not called")
-        }
+        val defaultPath = defaultPath ?: throw PaperDbException("Paper.init is not called")
+
         val key = (location ?: "") + name
-        synchronized(mBookMap) {
-            var book = mBookMap[key]
-            if (book == null) {
-                val path = location ?: defaultPath!!.toString()
-                book = Book(path, name, mCustomSerializers, customRegistrations)
-                mBookMap[key] = book
+//        return synchronized(books) {
+            return books.getOrPut(key) {
+                val path = location ?: defaultPath.toString()
+                Book(path, name, customSerializers, customRegistrations)
             }
-            return book
-        }
+//        }
     }
 
-    private fun removeLastFileSeparatorIfExists(customLocation: String): String {
-        return if (customLocation.endsWith(File.separatorChar)) {
-            customLocation.substring(0, customLocation.length - 1)
-        } else customLocation
+    private fun removeLastFileSeparator(customLocation: String): String {
+        return customLocation.removeSuffix(File.separator)
     }
 
     /**
@@ -116,7 +104,7 @@ object Paper {
      * @param level one of levels from [com.esotericsoftware.minlog.Log]
      */
     fun setLogLevel(level: Int) {
-        for ((_, value) in mBookMap) {
+        for ((_, value) in books) {
             value.setLogLevel(level)
         }
     }
@@ -129,25 +117,22 @@ object Paper {
      * @param serializer the serializer instance
      * @param <T>        type of the serializer
     </T> */
-    fun <T> register(clazz: Class<T>, serializer: Serializer<T>, id: Int) {
-        mCustomSerializers.add(Registration(clazz, serializer, id))
+    fun <T> register(clazz: Class<T>, id: Int, serializer: Serializer<T>?) {
+        customRegistrations[clazz] = Registration(id, serializer)
     }
 
-    fun <T> register(clazz: Class<T>, id: Int) {
-        customRegistrations[clazz] = id
-    }
-
-    inline fun <reified T> register(id: Int, serializer: Serializer<T>? = null) {
-        if (serializer != null) {
-            register(T::class.java, serializer, id)
-        } else {
-            register(T::class.java, id)
-        }
+    fun <T> addDefaultSerializer(clazz: Class<T>, serializerClass: Class<out Serializer<*>>) {
+        customSerializers[clazz] = serializerClass
     }
 }
-/**
- * Returns book instance to save data at custom location, e.g. on sdcard.
- *
- * @param location the path to a folder where the book's folder will be placed
- * @return book instance
- */
+
+inline fun <reified T> Paper.register(id: Int, serializer: Serializer<T>? = null) {
+    register(T::class.java, id, serializer)
+}
+
+inline fun <reified T, reified R: Serializer<*>> Paper.addDefaultSerializer() {
+    addDefaultSerializer(T::class.java, R::class.java)
+}
+
+internal typealias SerializerMap = LinkedHashMap<Class<*>, Class<out Serializer<*>>>
+internal typealias RegistrationMap = LinkedHashMap<Class<*>, Paper.Registration>
