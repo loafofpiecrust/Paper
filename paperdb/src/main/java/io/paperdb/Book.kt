@@ -2,6 +2,8 @@ package io.paperdb
 
 import com.esotericsoftware.kryo.Serializer
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.typeTokenOf
+import java.lang.reflect.Type
 
 class Book internal constructor(
     dbPath: String,
@@ -9,10 +11,13 @@ class Book internal constructor(
     serializers: SerializerMap,
     registrations: RegistrationMap
 ) {
-
-    private val mStorage = DbStoragePlainFile(
-        dbPath, dbName, serializers, registrations
-    )
+    private val mStorage by lazy {
+        DbStoragePlainFile(
+            dbPath,
+            dbName,
+            Paper.serializer ?: KryoSerializer(serializers, registrations)
+        )
+    }
 
     /**
      * Returns all keys for objects in book.
@@ -52,9 +57,13 @@ class Book internal constructor(
      * @param <T>   object type
      * @return this Book instance
     </T> */
-    suspend fun <T> write(key: String, value: T): Book {
-        mStorage.insert(key, value)
+    suspend fun <T> write(key: String, value: T, type: Type): Book {
+        mStorage.insert(key, value, type)
         return this
+    }
+
+    suspend inline fun <reified T: Any> write(key: String, value: T): Book {
+        return write(key, value, typeTokenOf<T>())
     }
 
     /**
@@ -68,11 +77,11 @@ class Book internal constructor(
      * @param key object key to read
      * @return the saved object instance or null
      */
-    suspend fun readAny(key: String): Any? {
-        return mStorage.select(key)
+    suspend fun readAny(key: String, type: Type): Any? {
+        return mStorage.select(key, type)
     }
     suspend inline fun <reified T> read(key: String): T? {
-        return readAny(key) as? T
+        return readAny(key, typeTokenOf<T>()) as? T
     }
 
     /**

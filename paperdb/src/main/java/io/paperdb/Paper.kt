@@ -29,7 +29,9 @@ object Paper {
 
     private var defaultPath: File? = null
 
-    internal class Registration(val id: Int, val serializer: Serializer<*>?)
+    class Registration(val id: Int, val serializer: Serializer<*>?)
+
+    var serializer: PaperSerializer? = null
 
     private val books = ConcurrentHashMap<String, Book>()
     private val customSerializers = SerializerMap()

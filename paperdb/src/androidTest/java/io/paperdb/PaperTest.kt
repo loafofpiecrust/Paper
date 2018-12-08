@@ -236,7 +236,7 @@ class PaperTest {
         try {
             val thing = Paper.book().read<Any>(key)
             assertThat(thing).isNull()
-        } catch (e: PaperDbException) {
+        } catch (e: Exception) {
             expectedException = e
             assertThat(e).isNotNull
         }

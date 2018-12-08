@@ -5,6 +5,7 @@ buildscript {
 }
 repositories {
     mavenCentral()
+    maven { url "https://kotlin.bintray.com/kotlinx" }
 }
 
 android {
@@ -64,6 +65,7 @@ dependencies {
     compile "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
     compile "org.jetbrains.kotlinx:kotlinx-io-jvm:0.1.1"
     compile "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.0.1"
+    compile "org.jetbrains.kotlinx:kotlinx-serialization-runtime:0.9.1"
 }
 
 apply from: '../publish.gradle'
